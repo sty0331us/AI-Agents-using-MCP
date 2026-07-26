@@ -1,10 +1,10 @@
 """
-Clothes Recommend System — local MCP server (STDIO).
+Clothes Recommend System — local MCP runtime (STDIO).
 
-Exposes weather lookup and clothing recommendation tools. Desktop hosts launch
-this process and speak MCP over stdin/stdout.
+Managed by the orchestrator (or any MCP host) as a child process. Speaks MCP
+over stdin/stdout for the lifetime of the session.
 
-Run::
+Entrypoint::
 
     python servers/local_stdio/server.py
 """

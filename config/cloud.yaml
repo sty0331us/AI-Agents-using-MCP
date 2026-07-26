@@ -1,0 +1,56 @@
+# Reference topology for cloud-hosted remote MCP (documentation + inventory).
+# Wire concrete resource IDs through environment variables / IaC — not hard-coded here.
+
+remote_mcp:
+  protocol: streamable-http
+  path: /mcp
+  health_path: /health
+  ready_path: /ready
+  # Set REMOTE_MCP_STATELESS_HTTP=true for multi-instance load balancing
+  scaling_mode: stateless
+
+aws:
+  compute:
+    - Amazon ECS on AWS Fargate
+    - Amazon EKS
+    - AWS App Runner
+  edge_and_traffic:
+    - Application Load Balancer (ALB) — L7 routing, health checks on /health
+    - Network Load Balancer (NLB) — high throughput / private link
+    - Amazon API Gateway (HTTP API) — auth, throttling, API keys, WAF association
+  security:
+    - AWS WAF
+    - AWS Certificate Manager (ACM)
+    - AWS Secrets Manager / SSM Parameter Store
+    - Amazon Cognito (Bearer tokens via REMOTE_MCP_AUTH_TOKEN)
+  observability:
+    - Amazon CloudWatch Logs / Metrics / Alarms
+    - AWS X-Ray
+  networking:
+    - Amazon VPC + private subnets for tasks
+    - AWS Cloud Map / Route 53 for service discovery
+
+azure:
+  compute:
+    - Azure Container Apps
+    - Azure Kubernetes Service (AKS)
+    - Azure App Service
+  edge_and_traffic:
+    - Azure Application Gateway — L7 + WAF, probes on /health
+    - Azure Front Door — global anycast entry
+    - Azure API Management (APIM) — subscriptions, policies, x-api-key
+  security:
+    - Microsoft Entra ID (Bearer tokens)
+    - Azure Key Vault
+    - Azure WAF (App Gateway / Front Door)
+  observability:
+    - Azure Monitor
+    - Application Insights
+  networking:
+    - Azure Virtual Network
+    - Private Endpoints / Private Link
+
+client_env_mapping:
+  REMOTE_MCP_URL: "https://<alb-or-apim-or-front-door-host>/mcp"
+  REMOTE_MCP_AUTH_TOKEN: "Bearer token from Cognito / Entra ID"
+  REMOTE_MCP_API_KEY: "API Gateway API key or APIM subscription key"

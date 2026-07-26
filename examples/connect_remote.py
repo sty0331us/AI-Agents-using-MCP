@@ -1,11 +1,7 @@
 """
-Fetch weather and recommend clothes via the remote MCP server.
+Clothes Recommend · remote MCP runtime (Streamable HTTP).
 
-Start the server first::
-
-    python servers/remote_http/server.py
-
-Then::
+Requires a reachable remote MCP service (see ``REMOTE_MCP_URL``)::
 
     PYTHONPATH=src python examples/connect_remote.py --location "Tokyo"
 """
@@ -24,7 +20,9 @@ from clothes_recommend.config import get_settings
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Clothes Recommend · remote MCP")
+    parser = argparse.ArgumentParser(
+        description="Clothes Recommend · remote MCP (Streamable HTTP)",
+    )
     parser.add_argument(
         "--location",
         "-l",
