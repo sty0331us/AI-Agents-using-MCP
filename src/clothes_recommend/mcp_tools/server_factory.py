@@ -11,8 +11,8 @@ def create_clothes_mcp(name: str = "clothes-recommend") -> FastMCP:
     """
     Build a FastMCP server with weather + clothing tools.
 
-    Used by local STDIO, remote HTTP, and in-process FastMCP clients so all
-    surfaces share one tool registration path.
+    Used by the local STDIO and remote HTTP FastMCP servers so both share
+    one tool registration path.
     """
     mcp = FastMCP(
         name=name,

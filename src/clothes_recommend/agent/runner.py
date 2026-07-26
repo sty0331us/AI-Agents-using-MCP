@@ -7,15 +7,11 @@ import json
 import time
 from typing import Any, Literal
 
-from clothes_recommend.clients import (
-    connect_inprocess_mcp,
-    connect_local_mcp,
-    connect_remote_mcp,
-)
+from clothes_recommend.clients import connect_local_mcp, connect_remote_mcp
 from clothes_recommend.clients.base import call_tool_data, list_tool_names
 from clothes_recommend.config import get_settings
 
-TransportName = Literal["inprocess", "stdio", "remote"]
+TransportName = Literal["local", "remote"]
 
 
 def _print_recommendation(payload: dict[str, Any]) -> None:
@@ -48,28 +44,19 @@ def _print_recommendation(payload: dict[str, Any]) -> None:
 
 
 def _client_for(transport: TransportName):
-    if transport == "inprocess":
-        return connect_inprocess_mcp()
-    if transport == "stdio":
-        return connect_local_mcp(keep_alive=True)
+    if transport == "local":
+        return connect_local_mcp()
     return connect_remote_mcp()
 
 
 def _label(transport: TransportName) -> str:
-    return {
-        "inprocess": "local FastMCP (in-process)",
-        "stdio": "local MCP (STDIO keep-alive)",
-        "remote": "remote MCP (Streamable HTTP)",
-    }[transport]
+    if transport == "local":
+        return "local MCP (STDIO)"
+    return "remote MCP (Streamable HTTP)"
 
 
 async def recommend_via_client(transport: TransportName, location: str) -> None:
-    """
-    Run recommendation through one MCP surface.
-
-    Uses ``recommend_clothes_for_location`` for a single round-trip instead of
-    separate weather + clothing calls.
-    """
+    """Run recommendation through the local STDIO or remote HTTP MCP server."""
     settings = get_settings()
     place = location or settings.default_location
     print(f"=== Clothes Recommend System · {_label(transport)} · {place} ===")
@@ -86,7 +73,7 @@ async def recommend_via_client(transport: TransportName, location: str) -> None:
         )
 
     elapsed_ms = (time.perf_counter() - started) * 1000
-    print(f"Round-trip: {elapsed_ms:.0f} ms (single FastMCP tool call)")
+    print(f"Elapsed: {elapsed_ms:.0f} ms")
 
     if not isinstance(payload, dict):
         print("Unexpected tool response.")
@@ -100,38 +87,22 @@ async def recommend_via_client(transport: TransportName, location: str) -> None:
     _print_recommendation(payload)
 
 
-async def run_inprocess(location: str | None = None) -> None:
-    await recommend_via_client(
-        "inprocess",
-        location or get_settings().default_location,
-    )
-
-
-async def run_stdio(location: str | None = None) -> None:
-    await recommend_via_client(
-        "stdio",
-        location or get_settings().default_location,
-    )
-
-
 async def run_local(location: str | None = None) -> None:
-    """Default local path: in-process FastMCP (fastest)."""
-    await run_inprocess(location)
+    """Connect to the local FastMCP server over STDIO."""
+    await recommend_via_client("local", location or get_settings().default_location)
 
 
 async def run_remote(location: str | None = None) -> None:
-    await recommend_via_client(
-        "remote",
-        location or get_settings().default_location,
-    )
+    """Connect to the remote FastMCP server over Streamable HTTP."""
+    await recommend_via_client("remote", location or get_settings().default_location)
 
 
 async def run_both(location: str | None = None) -> None:
-    """Run in-process and remote recommendations concurrently."""
+    """Query local STDIO and remote HTTP servers concurrently."""
     place = location or get_settings().default_location
     started = time.perf_counter()
     await asyncio.gather(
-        recommend_via_client("inprocess", place),
+        recommend_via_client("local", place),
         recommend_via_client("remote", place),
     )
     elapsed_ms = (time.perf_counter() - started) * 1000

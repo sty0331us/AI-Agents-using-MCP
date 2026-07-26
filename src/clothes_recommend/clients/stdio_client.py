@@ -1,4 +1,4 @@
-"""Local FastMCP client (STDIO transport) with session keep-alive."""
+"""Local FastMCP client using STDIO transport."""
 
 from __future__ import annotations
 
@@ -16,15 +16,8 @@ def build_stdio_transport(
     command: str | None = None,
     args: list[str] | None = None,
     env: dict[str, str] | None = None,
-    *,
-    keep_alive: bool = True,
 ) -> StdioTransport:
-    """
-    Build a STDIO transport.
-
-    ``keep_alive=True`` (default) reuses the subprocess across client contexts,
-    which is significantly faster for repeated calls.
-    """
+    """Build a FastMCP StdioTransport for the local MCP server."""
     settings = get_settings()
     configured = command or settings.local_mcp_command
     cmd = sys.executable if configured in {"python", "python3"} else configured
@@ -43,7 +36,6 @@ def build_stdio_transport(
         args=resolved_args,
         env={**os.environ, **(env or {})},
         cwd=str(REPO_ROOT),
-        keep_alive=keep_alive,
     )
 
 
@@ -51,15 +43,11 @@ def connect_local_mcp(
     command: str | None = None,
     args: list[str] | None = None,
     env: dict[str, str] | None = None,
-    *,
-    keep_alive: bool = True,
 ) -> Client:
-    """Return a FastMCP Client for the local Clothes Recommend STDIO server."""
-    return Client(
-        build_stdio_transport(
-            command=command,
-            args=args,
-            env=env,
-            keep_alive=keep_alive,
-        )
-    )
+    """
+    Return a FastMCP Client for the local Clothes Recommend STDIO server.
+
+    The client launches ``servers/local_stdio/server.py`` as a subprocess and
+    speaks MCP over stdin/stdout.
+    """
+    return Client(build_stdio_transport(command=command, args=args, env=env))

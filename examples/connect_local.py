@@ -1,5 +1,5 @@
 """
-Clothes Recommend · in-process FastMCP (fastest local path).
+Clothes Recommend · local FastMCP server (STDIO).
 
     PYTHONPATH=src python examples/connect_local.py --location "Seoul"
 """
@@ -19,7 +19,7 @@ from clothes_recommend.config import get_settings
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Clothes Recommend · in-process FastMCP",
+        description="Clothes Recommend · local MCP (STDIO)",
     )
     parser.add_argument(
         "--location",
