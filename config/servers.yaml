@@ -1,0 +1,21 @@
+# MCP server connection registry
+# --------------------------------
+# - local  -> STDIO transport (client spawns the process)
+# - remote -> Streamable HTTP transport (client connects to a URL)
+
+servers:
+  local_demo:
+    type: local
+    transport: stdio
+    command: python
+    args:
+      - servers/local_stdio/server.py
+    description: Example local MCP server launched as a subprocess
+
+  remote_demo:
+    type: remote
+    transport: streamable-http
+    url: http://localhost:8000/mcp
+    # Optional Bearer token for authenticated remote servers
+    # auth_token: ${REMOTE_MCP_AUTH_TOKEN}
+    description: Example remote MCP server over Streamable HTTP
