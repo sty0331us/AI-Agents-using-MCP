@@ -1,5 +1,5 @@
 """
-Clothes Recommend · local MCP runtime (STDIO).
+Clothes Recommend · local FastMCP server (STDIO).
 
     PYTHONPATH=src python examples/connect_local.py --location "Seoul"
 """

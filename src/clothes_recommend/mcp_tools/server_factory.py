@@ -5,20 +5,14 @@ from __future__ import annotations
 from fastmcp import FastMCP
 
 from clothes_recommend.mcp_tools import register_clothes_tools
-from clothes_recommend.mcp_tools.ops_routes import register_ops_routes
 
 
-def create_clothes_mcp(
-    name: str = "clothes-recommend",
-    *,
-    include_ops_routes: bool = False,
-) -> FastMCP:
+def create_clothes_mcp(name: str = "clothes-recommend") -> FastMCP:
     """
     Build a FastMCP server with weather + clothing tools.
 
     Used by the local STDIO and remote HTTP FastMCP servers so both share
-    one tool registration path. Set ``include_ops_routes=True`` on the remote
-    HTTP runtime so load balancers can probe ``/health`` and ``/ready``.
+    one tool registration path.
     """
     mcp = FastMCP(
         name=name,
@@ -29,6 +23,4 @@ def create_clothes_mcp(
         ),
     )
     register_clothes_tools(mcp)
-    if include_ops_routes:
-        register_ops_routes(mcp)
     return mcp

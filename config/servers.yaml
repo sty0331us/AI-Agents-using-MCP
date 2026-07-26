@@ -1,7 +1,7 @@
 # Clothes Recommend System — MCP server registry
 #
-# local  -> STDIO transport (orchestrator-managed process lifecycle)
-# remote -> Streamable HTTP transport (independently deployed service)
+# local  -> STDIO transport (client spawns the process)
+# remote -> Streamable HTTP transport (client connects to a URL)
 
 servers:
   clothes_recommend_local:
@@ -14,7 +14,7 @@ servers:
       - get_location_weather
       - recommend_clothes
       - recommend_clothes_for_location
-    description: Local Clothes Recommend MCP runtime (STDIO)
+    description: Local Clothes Recommend MCP server (STDIO)
 
   clothes_recommend_remote:
     type: remote
@@ -24,4 +24,4 @@ servers:
       - get_location_weather
       - recommend_clothes
       - recommend_clothes_for_location
-    description: Remote Clothes Recommend MCP runtime (Streamable HTTP)
+    description: Remote Clothes Recommend MCP server (HTTP)

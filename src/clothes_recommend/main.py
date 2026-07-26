@@ -1,15 +1,17 @@
 """
-Clothes Recommend System — operator CLI.
+Clothes Recommend System — CLI entry point.
 
-Local MCP runtime (STDIO)::
+Examples
+--------
+Local FastMCP server (STDIO)::
 
     python -m clothes_recommend.main local --location "Seoul"
 
-Remote MCP runtime (Streamable HTTP)::
+Remote FastMCP server (Streamable HTTP; start the remote server first)::
 
     python -m clothes_recommend.main remote --location "Tokyo"
 
-Both runtimes (parity check)::
+Both servers concurrently::
 
     python -m clothes_recommend.main both --location "London"
 """
