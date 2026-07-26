@@ -37,7 +37,7 @@ The system resolves a place name, fetches **today’s live weather**, and return
 |---|---|---|
 | Framework | FastMCP | FastMCP |
 | Transport | STDIO | Streamable HTTP |
-| Who starts the server | Client spawns the process | You start it separately |
+| Who starts the server | Client spawns the process | Needs to start it separately |
 | Endpoint | subprocess stdin/stdout | `http://127.0.0.1:8000/mcp` |
 | Client helper | `connect_local_mcp()` | `connect_remote_mcp()` |
 
