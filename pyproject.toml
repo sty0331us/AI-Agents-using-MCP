@@ -3,13 +3,13 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ai-agents-using-mcp"
-version = "0.1.0"
-description = "Python structure for connecting AI agents to local (STDIO) and remote (Streamable HTTP) MCP servers"
+name = "clothes-recommend-system"
+version = "1.0.0"
+description = "Clothes Recommend System — weather-aware outfit recommendations over FastMCP (local STDIO and remote HTTP)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp[cli]>=1.27,<2",
+    "fastmcp>=2.0",
     "httpx>=0.27",
     "python-dotenv>=1.0",
     "pydantic>=2.0",
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mcp-agent = "mcp_agent.main:main"
+clothes-recommend = "clothes_recommend.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

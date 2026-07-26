@@ -1,40 +1,27 @@
 """
-Local MCP server — STDIO transport.
+Clothes Recommend System — local MCP server (STDIO).
 
-The host (our agent client) launches this file as a subprocess and
-communicates over stdin/stdout. Do not print debug logs to stdout;
-they would corrupt the JSON-RPC stream. Use stderr if you need logging.
+Exposes weather lookup and clothing recommendation tools. Desktop hosts launch
+this process and speak MCP over stdin/stdout.
 
-Run standalone (for Inspector / manual testing)::
+Run::
 
     python servers/local_stdio/server.py
 """
 
 from __future__ import annotations
 
-from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
 
-mcp = FastMCP("local-demo")
+_SRC = Path(__file__).resolve().parents[2] / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
+from clothes_recommend.mcp_tools.server_factory import create_clothes_mcp
 
-@mcp.tool()
-def echo(message: str) -> str:
-    """Echo a message back to the caller."""
-    return f"[local] {message}"
-
-
-@mcp.tool()
-def add(a: int, b: int) -> int:
-    """Add two integers."""
-    return a + b
-
-
-@mcp.resource("note://local")
-def local_note() -> str:
-    """A sample resource from the local STDIO server."""
-    return "This resource is served by the local STDIO MCP server."
+mcp = create_clothes_mcp(name="clothes-recommend-local")
 
 
 if __name__ == "__main__":
-    # Default FastMCP transport is stdio.
-    mcp.run(transport="stdio")
+    mcp.run(transport="stdio", show_banner=False)

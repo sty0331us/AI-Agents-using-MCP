@@ -1,21 +1,27 @@
-# MCP server connection registry
-# --------------------------------
-# - local  -> STDIO transport (client spawns the process)
-# - remote -> Streamable HTTP transport (client connects to a URL)
+# Clothes Recommend System — MCP server registry
+#
+# local  -> STDIO transport (client spawns the process)
+# remote -> Streamable HTTP transport (client connects to a URL)
 
 servers:
-  local_demo:
+  clothes_recommend_local:
     type: local
     transport: stdio
     command: python
     args:
       - servers/local_stdio/server.py
-    description: Example local MCP server launched as a subprocess
+    tools:
+      - get_location_weather
+      - recommend_clothes
+      - recommend_clothes_for_location
+    description: Local Clothes Recommend MCP server (STDIO)
 
-  remote_demo:
+  clothes_recommend_remote:
     type: remote
     transport: streamable-http
     url: http://localhost:8000/mcp
-    # Optional Bearer token for authenticated remote servers
-    # auth_token: ${REMOTE_MCP_AUTH_TOKEN}
-    description: Example remote MCP server over Streamable HTTP
+    tools:
+      - get_location_weather
+      - recommend_clothes
+      - recommend_clothes_for_location
+    description: Remote Clothes Recommend MCP server (HTTP)

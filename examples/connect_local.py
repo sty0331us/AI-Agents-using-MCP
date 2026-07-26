@@ -1,29 +1,35 @@
 """
-Minimal example: connect to the local MCP server via STDIO.
+Clothes Recommend · in-process FastMCP (fastest local path).
 
-From the repository root::
-
-    PYTHONPATH=src python examples/connect_local.py
+    PYTHONPATH=src python examples/connect_local.py --location "Seoul"
 """
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from mcp_agent.clients import connect_local_mcp
-from mcp_agent.clients.base import call_tool_text, list_tool_names
+from clothes_recommend.agent.runner import run_local
+from clothes_recommend.config import get_settings
 
 
-async def main() -> None:
-    async with connect_local_mcp() as session:
-        print("Connected to local MCP (STDIO)")
-        print("Tools:", await list_tool_names(session))
-        print("echo:", await call_tool_text(session, "echo", {"message": "hi"}))
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Clothes Recommend · in-process FastMCP",
+    )
+    parser.add_argument(
+        "--location",
+        "-l",
+        default=get_settings().default_location,
+        help="City or place name",
+    )
+    args = parser.parse_args()
+    asyncio.run(run_local(args.location))
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

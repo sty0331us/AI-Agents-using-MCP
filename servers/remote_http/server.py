@@ -1,8 +1,7 @@
 """
-Remote MCP server — Streamable HTTP transport.
+Clothes Recommend System — remote MCP server (Streamable HTTP).
 
-This process listens on a TCP port. Clients connect with a URL such as
-``http://localhost:8000/mcp``. Start it before running the remote client.
+Serves weather and clothing tools over HTTP for networked clients.
 
 Run::
 
@@ -11,36 +10,23 @@ Run::
 
 from __future__ import annotations
 
-from mcp.server.fastmcp import FastMCP
+import sys
+from pathlib import Path
 
-mcp = FastMCP(
-    "remote-demo",
-    host="127.0.0.1",
-    port=8000,
-    streamable_http_path="/mcp",
-    json_response=True,
-)
+_SRC = Path(__file__).resolve().parents[2] / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
+from clothes_recommend.mcp_tools.server_factory import create_clothes_mcp
 
-@mcp.tool()
-def weather(city: str) -> str:
-    """Return a fake weather report for a city (demo only)."""
-    return f"[remote] Weather in {city}: sunny, 22°C"
-
-
-@mcp.tool()
-def add(a: int, b: int) -> int:
-    """Add two integers."""
-    return a + b
-
-
-@mcp.resource("note://remote")
-def remote_note() -> str:
-    """A sample resource from the remote HTTP server."""
-    return "This resource is served by the remote Streamable HTTP MCP server."
+mcp = create_clothes_mcp(name="clothes-recommend-remote")
 
 
 if __name__ == "__main__":
-    # Streamable HTTP is the recommended transport for networked / remote servers.
-    # host / port / path are configured on FastMCP(...) above.
-    mcp.run(transport="streamable-http")
+    mcp.run(
+        transport="http",
+        host="127.0.0.1",
+        port=8000,
+        path="/mcp",
+        show_banner=False,
+    )
