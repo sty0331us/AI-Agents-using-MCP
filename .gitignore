@@ -39,3 +39,8 @@ htmlcov/
 # Logs
 *.log
 logs/
+
+# RAG indexes / local artifacts
+data/indexes/
+*.faiss
+.chroma/

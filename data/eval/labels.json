@@ -1,0 +1,8 @@
+{
+  "How do multi-query retrievers improve recall?": ["02_multi_query.md"],
+  "Compare FAISS and Chroma for production RAG": ["05_faiss_vs_chroma.md"],
+  "advanced retrieval parent document strategy": ["04_parent_document.md"],
+  "What metrics matter for retriever evaluation?": ["06_evaluation.md"],
+  "When should I use a self-querying retriever?": ["03_self_query.md"],
+  "Explain production operations for RAG systems": ["07_production_ops.md"]
+}
