@@ -2,10 +2,12 @@
 
 Weather-aware clothing recommendations delivered through **FastMCP**.
 
-The system resolves a place name, fetches **today’s live weather**, and returns a structured **outfit recommendation**. Two separate FastMCP servers expose the same tools:
+The system resolves a place name, fetches **today’s live weather**, and returns a structured **outfit recommendation**. MCP Host and Client communicate with MCP servers using **JSON-RPC 2.0** messages over:
 
 1. **Local MCP server** — STDIO transport (`servers/local_stdio/server.py`)  
 2. **Remote MCP server** — Streamable HTTP transport (`servers/remote_http/server.py`)
+
+An **MCP Host (Web Client)** inherits the shared `McpClient` class so the browser UI and API reuse the same client logic as the CLI.
 
 ---
 
@@ -13,18 +15,24 @@ The system resolves a place name, fetches **today’s live weather**, and return
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│                   Clothes Recommend System                       │
-│                        FastMCP Client                            │
+│              MCP Host (Web Client) · McpHostApp                  │
+│              inherits McpClient                                  │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │
+                             │ uses / inherits
+                             ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                         McpClient                                │
+│              FastMCP Client · tools/list · tools/call            │
 └────────────────────┬──────────────────────────┬──────────────────┘
                      │                          │
-                     │ STDIO                    │ Streamable HTTP
-                     │ (spawn subprocess)       │ (connect to URL)
+                     │ JSON-RPC 2.0             │ JSON-RPC 2.0
+                     │ over STDIO               │ over Streamable HTTP
                      ▼                          ▼
 ┌────────────────────────────────┐  ┌──────────────────────────────┐
 │ Local FastMCP server           │  │ Remote FastMCP server        │
 │ clothes-recommend-local        │  │ clothes-recommend-remote     │
 │ servers/local_stdio/server.py  │  │ servers/remote_http/server.py│
-│ transport: stdio               │  │ http://127.0.0.1:8000/mcp    │
 └───────────────┬────────────────┘  └──────────────┬───────────────┘
                 │                                  │
                 └────────────────┬─────────────────┘
@@ -33,13 +41,52 @@ The system resolves a place name, fetches **today’s live weather**, and return
               Open-Meteo weather · clothing rules
 ```
 
+### JSON-RPC communication
+
+MCP does not invent a private wire format. Host and servers exchange **JSON-RPC 2.0** request/response objects (for example `tools/list` and `tools/call`). The transport only moves those JSON-RPC frames:
+
+| Transport | How JSON-RPC is carried |
+|---|---|
+| **STDIO (local)** | JSON-RPC messages on the child process stdin / stdout |
+| **Streamable HTTP (remote)** | JSON-RPC messages over HTTP to the MCP endpoint (`/mcp`) |
+
+`McpClient` and `McpHostApp` never hand-craft JSON-RPC packets; FastMCP encodes and decodes them. Inheritance keeps the Host on the same call path as the Client.
+
 | | **Local MCP** | **Remote MCP** |
 |---|---|---|
 | Framework | FastMCP | FastMCP |
 | Transport | STDIO | Streamable HTTP |
-| Lifecycle | Orchestrator launches and manages the process | Runs as a network service on a configured URL |
+| Wire protocol | JSON-RPC 2.0 | JSON-RPC 2.0 |
+| Lifecycle | Orchestrator / Host launches and manages the process | Runs as a network service on a configured URL |
 | Endpoint | subprocess stdin/stdout | `http://127.0.0.1:8000/mcp` |
-| Client helper | `connect_local_mcp()` | `connect_remote_mcp()` |
+| Client helper | `connect_local_mcp()` / `McpClient(transport="local")` | `connect_remote_mcp()` / `McpClient(transport="remote")` |
+
+---
+
+## MCP Host (Web Client)
+
+The Host is a FastAPI web app that **inherits** `McpClient`:
+
+```text
+McpHostApp(McpClient)
+  └── recommend_clothes_for_location()   # inherited
+  └── list_tools() / call_tool()         # inherited
+  └── FastAPI routes + HTML UI           # host-only
+```
+
+| Path | Role |
+|---|---|
+| `GET /` | Web UI for location + transport selection |
+| `POST /recommend` | Form submit → inherited MCP tool call |
+| `GET /api/tools` | List tools from the selected MCP server |
+| `POST /api/recommend` | JSON API for the same recommendation flow |
+| `GET /api/health` | Host health check |
+
+Source:
+
+- Client class: `src/clothes_recommend/clients/mcp_client.py`
+- Host app: `src/clothes_recommend/host/app.py`
+- UI template: `src/clothes_recommend/host/templates/index.html`
 
 ---
 
@@ -65,8 +112,12 @@ AI-Agents-using-MCP/
 │   │   ├── server_factory.py   # shared FastMCP server builder
 │   │   └── __init__.py         # tool registration
 │   ├── clients/
+│   │   ├── mcp_client.py       # McpClient class (JSON-RPC via FastMCP)
 │   │   ├── stdio_client.py     # local FastMCP Client (STDIO)
 │   │   └── http_client.py      # remote FastMCP Client (HTTP)
+│   ├── host/
+│   │   ├── app.py              # McpHostApp(McpClient) web host
+│   │   └── templates/          # browser UI
 │   ├── agent/runner.py
 │   └── main.py
 ├── servers/
@@ -99,31 +150,35 @@ Requires **Python 3.10+** and outbound HTTPS access to Open-Meteo.
 
 ## Run
 
-### Local MCP (STDIO)
-
-The client launches the FastMCP server as a subprocess:
+### MCP Host (Web Client)
 
 ```bash
-python -m clothes_recommend.main local --location "Seoul"
-# or
-python examples/connect_local.py --location "Seoul"
+export PYTHONPATH=src
+uvicorn clothes_recommend.host.app:app --host 127.0.0.1 --port 8080
 ```
 
-### Remote MCP (Streamable HTTP)
+Open `http://127.0.0.1:8080`. Choose **Local MCP (STDIO)** or **Remote MCP (Streamable HTTP)**.
 
-Run the remote FastMCP service, then connect the orchestrator to its URL:
+For remote transport, run the remote server first:
 
 ```bash
 python servers/remote_http/server.py
-
-python -m clothes_recommend.main remote --location "Tokyo"
-# or
-python examples/connect_remote.py --location "Tokyo"
 ```
 
-Default endpoint: `http://127.0.0.1:8000/mcp`. Override with `REMOTE_MCP_URL` when needed.
+### CLI · Local MCP (STDIO)
 
-### Both
+```bash
+python -m clothes_recommend.main local --location "Seoul"
+```
+
+### CLI · Remote MCP (Streamable HTTP)
+
+```bash
+python servers/remote_http/server.py
+python -m clothes_recommend.main remote --location "Tokyo"
+```
+
+### CLI · Both
 
 ```bash
 python servers/remote_http/server.py
@@ -132,39 +187,29 @@ python -m clothes_recommend.main both --location "London"
 
 ---
 
-## Client usage
+## Client and Host usage
 
 ```python
-from clothes_recommend.clients import connect_local_mcp, connect_remote_mcp
+from clothes_recommend.clients import McpClient
+from clothes_recommend.host import McpHostApp
 
-# Local FastMCP · STDIO
-async with connect_local_mcp() as client:
-    result = await client.call_tool(
-        "recommend_clothes_for_location",
-        {"location": "Seoul"},
-    )
+# MCP Client — JSON-RPC tool calls over STDIO or Streamable HTTP
+client = McpClient(transport="local")
+result = await client.recommend_clothes_for_location("Seoul")
 
-# Remote FastMCP · Streamable HTTP
-async with connect_remote_mcp("http://localhost:8000/mcp") as client:
-    result = await client.call_tool(
-        "recommend_clothes_for_location",
-        {"location": "Tokyo"},
-    )
+# MCP Host — inherits McpClient, adds web routes
+host = McpHostApp(transport="local")
+# host.app is a FastAPI ASGI application
 ```
 
-Under the hood:
+Low-level FastMCP wiring (still JSON-RPC on the wire):
 
 ```python
-# Local
 from fastmcp import Client
-from fastmcp.client.transports import StdioTransport
+from fastmcp.client.transports import StdioTransport, StreamableHttpTransport
 
-client = Client(StdioTransport(command="python", args=["servers/local_stdio/server.py"]))
-
-# Remote
-from fastmcp.client.transports import StreamableHttpTransport
-
-client = Client(StreamableHttpTransport(url="http://localhost:8000/mcp"))
+local = Client(StdioTransport(command="python", args=["servers/local_stdio/server.py"]))
+remote = Client(StreamableHttpTransport(url="http://localhost:8000/mcp"))
 ```
 
 ---
@@ -173,7 +218,7 @@ client = Client(StreamableHttpTransport(url="http://localhost:8000/mcp"))
 
 | Variable | Description | Default |
 |---|---|---|
-| `DEFAULT_LOCATION` | Default place for CLI runs | `Seoul` |
+| `DEFAULT_LOCATION` | Default place for CLI / Host form | `Seoul` |
 | `LOCAL_MCP_COMMAND` | Interpreter for the STDIO server | `python` |
 | `LOCAL_MCP_ARGS` | Local server script path | `servers/local_stdio/server.py` |
 | `REMOTE_MCP_URL` | Remote MCP endpoint | `http://localhost:8000/mcp` |
@@ -183,9 +228,10 @@ client = Client(StreamableHttpTransport(url="http://localhost:8000/mcp"))
 
 ## Design notes
 
-- **Two servers only** — local STDIO and remote Streamable HTTP; both built with FastMCP.
-- **Shared factory** — `create_clothes_mcp()` registers identical tools on both servers.
-- **Structured outputs** — tools return JSON-serializable dicts for agents and APIs.
+- **JSON-RPC on the wire** — Host/Client ↔ Server messages are JSON-RPC 2.0; STDIO and Streamable HTTP are transports only.
+- **Host inherits Client** — `McpHostApp(McpClient)` reuses the same tool methods for UI and API.
+- **Two servers** — local STDIO and remote Streamable HTTP; both built with FastMCP and the same tool factory.
+- **Structured outputs** — tools return JSON-serializable dicts for agents and the web host.
 
 ---
 

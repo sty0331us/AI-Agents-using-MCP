@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title }}</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --ink: #1c1917;
+      --muted: #57534e;
+      --line: #d6d3d1;
+      --accent: #0f766e;
+      --card: #fffcf7;
+      --danger: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, #e7e5e4 0, transparent 40%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    main {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+    h1 {
+      font-family: "IBM Plex Serif", Georgia, serif;
+      font-weight: 600;
+      font-size: clamp(1.75rem, 4vw, 2.4rem);
+      margin: 0 0 0.4rem;
+      letter-spacing: -0.02em;
+    }
+    .lede {
+      color: var(--muted);
+      max-width: 42rem;
+      line-height: 1.55;
+      margin-bottom: 1.75rem;
+    }
+    .protocol {
+      display: inline-block;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, white);
+      padding: 0.25rem 0.55rem;
+      margin-bottom: 1rem;
+    }
+    form {
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 1.25rem;
+      display: grid;
+      gap: 0.9rem;
+    }
+    label {
+      display: grid;
+      gap: 0.35rem;
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+    input, select, button {
+      font: inherit;
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+    }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { filter: brightness(0.95); }
+    .meta {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .error {
+      margin-top: 1.25rem;
+      padding: 0.9rem 1rem;
+      border: 1px solid color-mix(in srgb, var(--danger) 40%, white);
+      color: var(--danger);
+      background: #fff;
+    }
+    .result {
+      margin-top: 1.5rem;
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 1.25rem;
+    }
+    .result h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1.15rem;
+    }
+    .summary { line-height: 1.5; margin-bottom: 1rem; }
+    .grid {
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .chip {
+      border: 1px solid var(--line);
+      padding: 0.7rem 0.8rem;
+      background: #fff;
+    }
+    .chip strong {
+      display: block;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .chip span { font-size: 0.92rem; line-height: 1.4; }
+    pre {
+      margin: 1rem 0 0;
+      padding: 0.85rem;
+      overflow: auto;
+      background: #1c1917;
+      color: #f5f5f4;
+      font-size: 0.78rem;
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="protocol">MCP Host · JSON-RPC 2.0 · inherits McpClient</div>
+    <h1>Clothes Recommend</h1>
+    <p class="lede">
+      Web MCP Host for weather-aware outfit recommendations.
+      This host inherits <code>McpClient</code> and talks to local (STDIO) or
+      remote (Streamable HTTP) MCP servers using JSON-RPC messages.
+    </p>
+
+    <form method="post" action="/recommend">
+      <label>
+        Location
+        <input type="text" name="location" required value="{{ default_location }}" placeholder="Seoul" />
+      </label>
+      <label>
+        MCP transport
+        <select name="transport">
+          <option value="local" {% if default_transport == "local" %}selected{% endif %}>
+            Local MCP (STDIO)
+          </option>
+          <option value="remote" {% if default_transport == "remote" %}selected{% endif %}>
+            Remote MCP (Streamable HTTP)
+          </option>
+        </select>
+      </label>
+      <p class="meta">Remote endpoint: {{ remote_mcp_url }}</p>
+      <button type="submit">Recommend clothes</button>
+    </form>
+
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+
+    {% if result %}
+    <section class="result">
+      <h2>Recommendation</h2>
+      {% set weather = result.weather or {} %}
+      {% set rec = result.recommendation or result %}
+      {% if weather %}
+      <p class="summary">
+        <strong>{{ weather.weather_label }}</strong>
+        · {{ weather.temperature_c }}°C
+        (feels like {{ weather.apparent_temperature_c }}°C)
+      </p>
+      {% endif %}
+      <p class="summary">{{ rec.summary }}</p>
+      <div class="grid">
+        {% for section in ["base_layers", "outerwear", "bottoms", "footwear", "accessories"] %}
+          {% set items = rec[section] or [] %}
+          {% if items %}
+          <div class="chip">
+            <strong>{{ section.replace("_", " ") }}</strong>
+            <span>{{ items | join(", ") }}</span>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <pre>{{ result | tojson(indent=2) }}</pre>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>
