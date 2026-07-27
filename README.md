@@ -13,32 +13,149 @@ An **MCP Host (Web Client)** inherits the shared `McpClient` class so the browse
 
 ## Architecture
 
+### System overview
+
 ```text
-┌──────────────────────────────────────────────────────────────────┐
-│              MCP Host (Web Client) · McpHostApp                  │
-│              inherits McpClient                                  │
-└────────────────────────────┬─────────────────────────────────────┘
-                             │
-                             │ uses / inherits
-                             ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                         McpClient                                │
-│              FastMCP Client · tools/list · tools/call            │
-└────────────────────┬──────────────────────────┬──────────────────┘
-                     │                          │
-                     │ JSON-RPC 2.0             │ JSON-RPC 2.0
-                     │ over STDIO               │ over Streamable HTTP
-                     ▼                          ▼
-┌────────────────────────────────┐  ┌──────────────────────────────┐
-│ Local FastMCP server           │  │ Remote FastMCP server        │
-│ clothes-recommend-local        │  │ clothes-recommend-remote     │
-│ servers/local_stdio/server.py  │  │ servers/remote_http/server.py│
-└───────────────┬────────────────┘  └──────────────┬───────────────┘
-                │                                  │
-                └────────────────┬─────────────────┘
+┌─ Entry points ─────────────────────────────────────────────────────────────┐
+│  Browser UI / REST API              CLI orchestrator                       │
+│  GET /  POST /recommend             python -m clothes_recommend.main       │
+│  GET /api/tools  POST /api/recommend   local | remote | both               │
+└───────────────┬───────────────────────────────┬────────────────────────────┘
+                │                               │
+                ▼                               ▼
+┌───────────────────────────────┐   ┌───────────────────────────────────────┐
+│ MCP Host · McpHostApp         │   │ agent/runner.py                       │
+│ host/app.py                   │   │ recommend_via_client(transport, loc)  │
+│                               │   └───────────────────┬───────────────────┘
+│  inherits ─────────────────┐  │                       │
+│                            ▼  │                       │
+│               ┌──────────────────────────────┐        │
+│               │ McpClient                    │◄───────┘
+│               │ clients/mcp_client.py        │
+│               │                              │
+│               │ 1. select transport          │
+│               │ 2. open_session()            │
+│               │ 3. tools/list | tools/call   │
+│               └──────────────┬───────────────┘
+└──────────────────────────────┼────────────────┘
+                               │
+              FastMCP Client encodes JSON-RPC 2.0
+                               │
+           ┌───────────────────┴───────────────────┐
+           │                                       │
+           │ transport="local"                     │ transport="remote"
+           │ StdioTransport                        │ StreamableHttpTransport
+           │ subprocess stdin/stdout               │ HTTP POST → /mcp
+           ▼                                       ▼
+┌────────────────────────────┐         ┌────────────────────────────┐
+│ Local FastMCP server       │         │ Remote FastMCP server      │
+│ clothes-recommend-local    │         │ clothes-recommend-remote   │
+│ servers/local_stdio/       │         │ servers/remote_http/       │
+│   server.py                │         │   server.py                │
+└─────────────┬──────────────┘         └─────────────┬──────────────┘
+              │                                      │
+              └──────────────────┬───────────────────┘
                                  ▼
-              create_clothes_mcp() + domain services
-              Open-Meteo weather · clothing rules
+              ┌──────────────────────────────────────┐
+              │ create_clothes_mcp()                 │
+              │ mcp_tools/server_factory.py          │
+              │   └── register_clothes_tools(mcp)    │
+              │                                      │
+              │ Tools (same on both servers):        │
+              │  • get_location_weather              │
+              │  • recommend_clothes                 │
+              │  • recommend_clothes_for_location ★  │
+              └──────────────────┬───────────────────┘
+                                 ▼
+              ┌──────────────────────────────────────┐
+              │ Domain services                      │
+              │                                      │
+              │ WeatherService (domain/weather.py)   │
+              │  geocode → forecast → WeatherSnapshot│
+              │  (Open-Meteo + 120s cache)           │
+              │                                      │
+              │ Clothing engine (domain/clothing.py) │
+              │  temp band → base outfit             │
+              │  + WMO / wind / humidity modifiers   │
+              └──────────────────────────────────────┘
+```
+
+### Recommendation logic flow
+
+Primary path used by Host and CLI: one MCP round-trip via `recommend_clothes_for_location`.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Host as McpHostApp / CLI
+    participant Client as McpClient
+    participant Transport as STDIO or Streamable HTTP
+    participant Server as FastMCP server
+    participant Weather as WeatherService
+    participant OpenMeteo as Open-Meteo APIs
+    participant Rules as Clothing engine
+
+    User->>Host: location + transport (local|remote)
+    Host->>Client: recommend_clothes_for_location(location)
+    Client->>Client: open_session() for selected transport
+    Client->>Transport: JSON-RPC tools/call
+    Transport->>Server: recommend_clothes_for_location
+
+    Server->>Weather: fetch_weather(location)
+    alt cache hit (TTL 120s)
+        Weather-->>Server: WeatherSnapshot
+    else cache miss
+        Weather->>OpenMeteo: geocode place name
+        OpenMeteo-->>Weather: lat/lon + timezone
+        Weather->>OpenMeteo: current forecast
+        OpenMeteo-->>Weather: temp, WMO code, wind, humidity…
+        Weather-->>Server: WeatherSnapshot (cached)
+    end
+
+    Server->>Rules: recommend_from_snapshot(snapshot)
+    Note over Rules: effective °C → temperature_band<br/>freezing|cold|cool|mild|warm|hot
+    Note over Rules: apply WMO modifiers<br/>rain / snow / storm / fog<br/>+ wind ≥30 km/h + high humidity
+    Rules-->>Server: OutfitRecommendation
+    Server-->>Transport: { ok, weather, recommendation }
+    Transport-->>Client: JSON-RPC result
+    Client-->>Host: structured dict
+    Host-->>User: HTML / JSON / CLI print
+```
+
+### Clothing rule logic (server-side)
+
+```text
+WeatherSnapshot
+       │
+       ▼
+ effective_temp = apparent_temperature_c ?? temperature_c
+       │
+       ▼
+ temperature_band(effective_temp)
+   <0 freezing · <10 cold · <18 cool · <24 mild · <30 warm · else hot
+       │
+       ▼
+ base outfit by band
+   (base_layers, outerwear, bottoms, footwear, accessories, avoid)
+       │
+       ├── WMO rain?   → waterproof shell, umbrella, avoid suede
+       ├── WMO snow?   → insulated coat, snow boots, traction
+       ├── WMO storm?  → reduce outdoor exposure note
+       ├── WMO fog?    → high-visibility layer note
+       ├── wind ≥ 30?  → windproof shell
+       └── humidity ≥ 80% and warm/hot? → breathable-fabric note
+       │
+       ▼
+ OutfitRecommendation { summary, layers…, notes }
+```
+
+Alternate two-step path (when the caller already has weather data):
+
+```text
+get_location_weather(location)
+        → WeatherSnapshot fields
+recommend_clothes(temperature_c, weather_code, …)
+        → OutfitRecommendation only
 ```
 
 ### JSON-RPC communication
