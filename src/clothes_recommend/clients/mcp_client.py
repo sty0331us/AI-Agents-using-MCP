@@ -38,30 +38,48 @@ class McpClient:
         self.remote_url = remote_url
         self.auth_token = auth_token
 
-    def open_session(self) -> Client:
-        """Return a FastMCP Client bound to the configured transport."""
-        if self.transport == "local":
+    def open_session(self, transport: TransportName | None = None) -> Client:
+        """Return a FastMCP Client bound to the given or default transport."""
+        chosen = transport or self.transport
+        if chosen == "local":
             return connect_local_mcp()
         return connect_remote_mcp(url=self.remote_url, auth_token=self.auth_token)
 
-    async def list_tools(self) -> list[str]:
-        async with self.open_session() as client:
+    async def list_tools(self, transport: TransportName | None = None) -> list[str]:
+        async with self.open_session(transport) as client:
             return await list_tool_names(client)
 
     async def call_tool(
         self,
         name: str,
         arguments: dict[str, Any] | None = None,
+        *,
+        transport: TransportName | None = None,
     ) -> Any:
         """Invoke an MCP tool (JSON-RPC ``tools/call`` under the hood)."""
-        async with self.open_session() as client:
+        async with self.open_session(transport) as client:
             return await call_tool_data(client, name, arguments)
 
-    async def get_location_weather(self, location: str) -> Any:
-        return await self.call_tool("get_location_weather", {"location": location})
+    async def get_location_weather(
+        self,
+        location: str,
+        *,
+        transport: TransportName | None = None,
+    ) -> Any:
+        return await self.call_tool(
+            "get_location_weather",
+            {"location": location},
+            transport=transport,
+        )
 
-    async def recommend_clothes_for_location(self, location: str) -> Any:
+    async def recommend_clothes_for_location(
+        self,
+        location: str,
+        *,
+        transport: TransportName | None = None,
+    ) -> Any:
         return await self.call_tool(
             "recommend_clothes_for_location",
             {"location": location},
+            transport=transport,
         )
