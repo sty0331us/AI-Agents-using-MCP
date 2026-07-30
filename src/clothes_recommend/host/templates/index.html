@@ -158,6 +158,16 @@
           </option>
         </select>
       </label>
+      <label>
+        Activity
+        <select name="activity">
+          {% for option in ["general", "commute", "outdoor", "office"] %}
+          <option value="{{ option }}" {% if default_activity == option %}selected{% endif %}>
+            {{ option | capitalize }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
       <p class="meta">Remote endpoint: {{ remote_mcp_url }}</p>
       <button type="submit">Recommend clothes</button>
     </form>

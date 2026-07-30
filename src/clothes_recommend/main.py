@@ -52,17 +52,24 @@ def build_parser() -> argparse.ArgumentParser:
         default=settings.default_location,
         help=f"City or place name (default: {settings.default_location})",
     )
+    parser.add_argument(
+        "--activity",
+        "-a",
+        choices=("general", "commute", "outdoor", "office"),
+        default="general",
+        help="Outfit context: general, commute, outdoor, or office (default: general)",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     if args.target == "local":
-        asyncio.run(run_local(args.location))
+        asyncio.run(run_local(args.location, activity=args.activity))
     elif args.target == "remote":
-        asyncio.run(run_remote(args.location))
+        asyncio.run(run_remote(args.location, activity=args.activity))
     else:
-        asyncio.run(run_both(args.location))
+        asyncio.run(run_both(args.location, activity=args.activity))
 
 
 if __name__ == "__main__":

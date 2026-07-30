@@ -43,6 +43,8 @@ TemperatureBand = Literal[
     "hot",
 ]
 
+ActivityPreference = Literal["general", "commute", "outdoor", "office"]
+
 
 class OutfitRecommendation(BaseModel):
     """Structured clothing recommendation derived from weather."""
@@ -52,6 +54,7 @@ class OutfitRecommendation(BaseModel):
     apparent_temperature_c: float | None = None
     weather_label: str
     temperature_band: TemperatureBand
+    activity: ActivityPreference = "general"
     summary: str
     base_layers: list[str] = Field(default_factory=list)
     outerwear: list[str] = Field(default_factory=list)

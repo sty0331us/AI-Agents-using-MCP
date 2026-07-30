@@ -60,8 +60,12 @@ class McpClient:
     async def get_location_weather(self, location: str) -> Any:
         return await self.call_tool("get_location_weather", {"location": location})
 
-    async def recommend_clothes_for_location(self, location: str) -> Any:
+    async def recommend_clothes_for_location(
+        self,
+        location: str,
+        activity: str = "general",
+    ) -> Any:
         return await self.call_tool(
             "recommend_clothes_for_location",
-            {"location": location},
+            {"location": location, "activity": activity},
         )

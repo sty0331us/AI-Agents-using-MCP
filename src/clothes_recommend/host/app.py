@@ -20,6 +20,7 @@ from clothes_recommend.clients.mcp_client import McpClient
 from clothes_recommend.config import get_settings
 
 TransportName = Literal["local", "remote"]
+ActivityPreference = Literal["general", "commute", "outdoor", "office"]
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -27,6 +28,7 @@ _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 class RecommendRequest(BaseModel):
     location: str = Field(min_length=1, description="City or place name")
     transport: TransportName = "local"
+    activity: ActivityPreference = "general"
 
 
 class McpHostApp(McpClient):
@@ -77,6 +79,7 @@ class McpHostApp(McpClient):
                     "title": app.title,
                     "default_location": self.settings.default_location,
                     "default_transport": self.transport,
+                    "default_activity": "general",
                     "remote_mcp_url": self.remote_url or self.settings.remote_mcp_url,
                     "result": None,
                     "error": None,
@@ -88,11 +91,16 @@ class McpHostApp(McpClient):
             request: Request,
             location: str = Form(...),
             transport: TransportName = Form("local"),
+            activity: ActivityPreference = Form("general"),
         ) -> HTMLResponse:
             error: str | None = None
             result: dict[str, Any] | None = None
             try:
-                result = await self._recommend(location=location.strip(), transport=transport)
+                result = await self._recommend(
+                    location=location.strip(),
+                    transport=transport,
+                    activity=activity,
+                )
             except Exception as exc:  # noqa: BLE001 — surface to UI
                 error = str(exc)
 
@@ -103,6 +111,7 @@ class McpHostApp(McpClient):
                     "title": app.title,
                     "default_location": location,
                     "default_transport": transport,
+                    "default_activity": activity,
                     "remote_mcp_url": self.remote_url or self.settings.remote_mcp_url,
                     "result": result,
                     "error": error,
@@ -127,6 +136,7 @@ class McpHostApp(McpClient):
                 payload = await self._recommend(
                     location=body.location.strip(),
                     transport=body.transport,
+                    activity=body.activity,
                 )
             except Exception as exc:  # noqa: BLE001
                 return JSONResponse(
@@ -151,12 +161,13 @@ class McpHostApp(McpClient):
         *,
         location: str,
         transport: TransportName,
+        activity: ActivityPreference = "general",
     ) -> Any:
         if not location:
             raise ValueError("location must not be empty")
         # Host reuses inherited McpClient methods after selecting transport.
         self.transport = transport
-        return await self.recommend_clothes_for_location(location)
+        return await self.recommend_clothes_for_location(location, activity=activity)
 
 
 def create_host_app(

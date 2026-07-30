@@ -55,11 +55,15 @@ def _label(transport: TransportName) -> str:
     return "remote MCP (Streamable HTTP)"
 
 
-async def recommend_via_client(transport: TransportName, location: str) -> None:
+async def recommend_via_client(
+    transport: TransportName,
+    location: str,
+    activity: str = "general",
+) -> None:
     """Run recommendation through the local STDIO or remote HTTP MCP server."""
     settings = get_settings()
     place = location or settings.default_location
-    print(f"=== Clothes Recommend System · {_label(transport)} · {place} ===")
+    print(f"=== Clothes Recommend System · {_label(transport)} · {place} · {activity} ===")
 
     started = time.perf_counter()
     async with _client_for(transport) as client:
@@ -69,7 +73,7 @@ async def recommend_via_client(transport: TransportName, location: str) -> None:
         payload = await call_tool_data(
             client,
             "recommend_clothes_for_location",
-            {"location": place},
+            {"location": place, "activity": activity},
         )
 
     elapsed_ms = (time.perf_counter() - started) * 1000
@@ -87,23 +91,31 @@ async def recommend_via_client(transport: TransportName, location: str) -> None:
     _print_recommendation(payload)
 
 
-async def run_local(location: str | None = None) -> None:
+async def run_local(location: str | None = None, activity: str = "general") -> None:
     """Connect to the local FastMCP server over STDIO."""
-    await recommend_via_client("local", location or get_settings().default_location)
+    await recommend_via_client(
+        "local",
+        location or get_settings().default_location,
+        activity=activity,
+    )
 
 
-async def run_remote(location: str | None = None) -> None:
+async def run_remote(location: str | None = None, activity: str = "general") -> None:
     """Connect to the remote FastMCP server over Streamable HTTP."""
-    await recommend_via_client("remote", location or get_settings().default_location)
+    await recommend_via_client(
+        "remote",
+        location or get_settings().default_location,
+        activity=activity,
+    )
 
 
-async def run_both(location: str | None = None) -> None:
+async def run_both(location: str | None = None, activity: str = "general") -> None:
     """Query local STDIO and remote HTTP servers concurrently."""
     place = location or get_settings().default_location
     started = time.perf_counter()
     await asyncio.gather(
-        recommend_via_client("local", place),
-        recommend_via_client("remote", place),
+        recommend_via_client("local", place, activity=activity),
+        recommend_via_client("remote", place, activity=activity),
     )
     elapsed_ms = (time.perf_counter() - started) * 1000
     print(f"\nConcurrent local+remote wall time: {elapsed_ms:.0f} ms")

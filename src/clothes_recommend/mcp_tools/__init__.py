@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastmcp import FastMCP
 
 from clothes_recommend.domain.clothing import recommend_from_snapshot, recommend_outfit
 from clothes_recommend.domain.weather import WeatherServiceError, fetch_weather
 from clothes_recommend.domain.wmo import weather_label
+
+ActivityPreference = Literal["general", "commute", "outdoor", "office"]
 
 
 def register_clothes_tools(mcp: FastMCP) -> FastMCP:
@@ -61,14 +63,14 @@ def register_clothes_tools(mcp: FastMCP) -> FastMCP:
         apparent_temperature_c: float | None = None,
         wind_speed_kmh: float | None = None,
         relative_humidity_pct: int | None = None,
+        activity: ActivityPreference = "general",
     ) -> dict[str, Any]:
         """
         Recommend an outfit from temperature and weather conditions.
 
         Pass temperature_c and a WMO weather_code (from get_location_weather).
-        Optional apparent_temperature_c, wind_speed_kmh, and humidity refine
-        the recommendation. Returns base layers, outerwear, bottoms, footwear,
-        accessories, items to avoid, and brief notes.
+        Optional apparent_temperature_c, wind_speed_kmh, humidity, and activity
+        (general|commute|outdoor|office) refine the recommendation.
         """
         outfit = recommend_outfit(
             temperature_c=temperature_c,
@@ -78,14 +80,19 @@ def register_clothes_tools(mcp: FastMCP) -> FastMCP:
             apparent_temperature_c=apparent_temperature_c,
             wind_speed_kmh=wind_speed_kmh,
             relative_humidity_pct=relative_humidity_pct,
+            activity=activity,
         )
         return {"ok": True, **outfit.model_dump()}
 
     @mcp.tool
-    async def recommend_clothes_for_location(location: str) -> dict[str, Any]:
+    async def recommend_clothes_for_location(
+        location: str,
+        activity: ActivityPreference = "general",
+    ) -> dict[str, Any]:
         """
         Fast path: fetch today's weather and recommend clothes in one call.
 
+        Optional activity (general|commute|outdoor|office) tunes the outfit.
         Prefer this tool to avoid an extra MCP round-trip when the caller only
         has a place name.
         """
@@ -96,7 +103,7 @@ def register_clothes_tools(mcp: FastMCP) -> FastMCP:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": f"Weather lookup failed: {exc}"}
 
-        outfit = recommend_from_snapshot(snapshot)
+        outfit = recommend_from_snapshot(snapshot, activity=activity)
         return {
             "ok": True,
             "weather": {

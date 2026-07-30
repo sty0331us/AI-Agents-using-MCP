@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from clothes_recommend.domain.models import (
+    ActivityPreference,
     OutfitRecommendation,
     TemperatureBand,
     WeatherSnapshot,
@@ -33,12 +34,13 @@ def recommend_outfit(
     apparent_temperature_c: float | None = None,
     wind_speed_kmh: float | None = None,
     relative_humidity_pct: int | None = None,
+    activity: ActivityPreference = "general",
 ) -> OutfitRecommendation:
     """
     Build an outfit recommendation from temperature and WMO weather code.
 
     Uses apparent temperature when available (wind chill / heat index),
-    then applies precipitation, wind, and humidity modifiers.
+    then applies precipitation, wind, humidity, and activity modifiers.
     """
     effective = (
         apparent_temperature_c if apparent_temperature_c is not None else temperature_c
@@ -131,9 +133,22 @@ def recommend_outfit(
     }:
         notes.append("High humidity — choose loose, breathable fabrics.")
 
+    base_layers, outerwear, bottoms, footwear, accessories, avoid, notes = _apply_activity(
+        activity,
+        band=band,
+        base_layers=base_layers,
+        outerwear=outerwear,
+        bottoms=bottoms,
+        footwear=footwear,
+        accessories=accessories,
+        avoid=avoid,
+        notes=notes,
+    )
+
+    activity_hint = "" if activity == "general" else f" for {activity}"
     summary = (
         f"For {location_label}: {weather_label.lower()} at {temperature_c:.1f}°C "
-        f"(feels like {effective:.1f}°C) — dress for a {band} day."
+        f"(feels like {effective:.1f}°C) — dress for a {band} day{activity_hint}."
     )
 
     return OutfitRecommendation(
@@ -142,6 +157,7 @@ def recommend_outfit(
         apparent_temperature_c=apparent_temperature_c,
         weather_label=weather_label,
         temperature_band=band,
+        activity=activity,
         summary=summary,
         base_layers=base_layers,
         outerwear=outerwear,
@@ -153,7 +169,11 @@ def recommend_outfit(
     )
 
 
-def recommend_from_snapshot(snapshot: WeatherSnapshot) -> OutfitRecommendation:
+def recommend_from_snapshot(
+    snapshot: WeatherSnapshot,
+    *,
+    activity: ActivityPreference = "general",
+) -> OutfitRecommendation:
     location = snapshot.location
     parts = [location.name]
     if location.admin1:
@@ -169,7 +189,43 @@ def recommend_from_snapshot(snapshot: WeatherSnapshot) -> OutfitRecommendation:
         apparent_temperature_c=snapshot.apparent_temperature_c,
         wind_speed_kmh=snapshot.wind_speed_kmh,
         relative_humidity_pct=snapshot.relative_humidity_pct,
+        activity=activity,
     )
+
+
+def _apply_activity(
+    activity: ActivityPreference,
+    *,
+    band: TemperatureBand,
+    base_layers: list[str],
+    outerwear: list[str],
+    bottoms: list[str],
+    footwear: list[str],
+    accessories: list[str],
+    avoid: list[str],
+    notes: list[str],
+) -> tuple[list[str], list[str], list[str], list[str], list[str], list[str], list[str]]:
+    if activity == "commute":
+        outerwear = _unique([*outerwear, "Packable layer for transit"])
+        accessories = _unique([*accessories, "Compact bag for work essentials"])
+        footwear = _unique([*footwear, "Comfortable walking shoes"])
+        notes.append("Commute mode — prioritize comfort for walking and transit.")
+        if band in {"warm", "hot"}:
+            avoid = _unique([*avoid, "Dress shoes without breathability"])
+    elif activity == "outdoor":
+        accessories = _unique([*accessories, "Sun protection / SPF", "Reusable water bottle"])
+        footwear = _unique([*footwear, "Supportive outdoor shoes"])
+        outerwear = _unique([*outerwear, "Lightweight packable shell"])
+        notes.append("Outdoor activity — dress for changing conditions and sun exposure.")
+        avoid = _unique([*avoid, "Delicate fabrics", "Unstable footwear"])
+    elif activity == "office":
+        base_layers = _unique(["Breathable button-up or knit polo", *base_layers])
+        bottoms = _unique(["Chinos or tailored trousers", *bottoms])
+        footwear = _unique([*footwear, "Smart-casual shoes"])
+        outerwear = _unique([*outerwear, "Light blazer or cardigan for indoor AC"])
+        avoid = _unique([*avoid, "Gym shorts", "Beach sandals"])
+        notes.append("Office mode — keep a polished look with an indoor layer for AC.")
+    return base_layers, outerwear, bottoms, footwear, accessories, avoid, notes
 
 
 def _unique(items: list[str]) -> list[str]:
