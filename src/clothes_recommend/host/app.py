@@ -29,6 +29,10 @@ class RecommendRequest(BaseModel):
     transport: TransportName = "local"
 
 
+class McpToolError(RuntimeError):
+    """Raised when an MCP tool returns a soft failure payload."""
+
+
 class McpHostApp(McpClient):
     """
     MCP Host web application.
@@ -111,10 +115,16 @@ class McpHostApp(McpClient):
 
         @app.get("/api/tools")
         async def api_tools(transport: TransportName = "local") -> JSONResponse:
-            self.transport = transport
-            tools = await self.list_tools()
+            try:
+                tools = await self.list_tools(transport=transport)
+            except Exception as exc:  # noqa: BLE001
+                return JSONResponse(
+                    {"ok": False, "error": str(exc), "transport": transport},
+                    status_code=502,
+                )
             return JSONResponse(
                 {
+                    "ok": True,
                     "transport": transport,
                     "tools": tools,
                     "protocol": "JSON-RPC 2.0 over MCP",
@@ -127,6 +137,11 @@ class McpHostApp(McpClient):
                 payload = await self._recommend(
                     location=body.location.strip(),
                     transport=body.transport,
+                )
+            except McpToolError as exc:
+                return JSONResponse(
+                    {"ok": False, "error": str(exc)},
+                    status_code=400,
                 )
             except Exception as exc:  # noqa: BLE001
                 return JSONResponse(
@@ -154,9 +169,13 @@ class McpHostApp(McpClient):
     ) -> Any:
         if not location:
             raise ValueError("location must not be empty")
-        # Host reuses inherited McpClient methods after selecting transport.
-        self.transport = transport
-        return await self.recommend_clothes_for_location(location)
+        payload = await self.recommend_clothes_for_location(
+            location,
+            transport=transport,
+        )
+        if isinstance(payload, dict) and payload.get("ok") is False:
+            raise McpToolError(str(payload.get("error") or "Recommendation failed"))
+        return payload
 
 
 def create_host_app(
