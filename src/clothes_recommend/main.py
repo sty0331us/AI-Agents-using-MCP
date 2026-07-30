@@ -14,6 +14,10 @@ Remote FastMCP server (Streamable HTTP; start the remote server first)::
 Both servers concurrently::
 
     python -m clothes_recommend.main both --location "London"
+
+JSON output for scripting::
+
+    python -m clothes_recommend.main local --location "Seoul" --json
 """
 
 from __future__ import annotations
@@ -52,17 +56,22 @@ def build_parser() -> argparse.ArgumentParser:
         default=settings.default_location,
         help=f"City or place name (default: {settings.default_location})",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON instead of human-readable text",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     if args.target == "local":
-        asyncio.run(run_local(args.location))
+        asyncio.run(run_local(args.location, as_json=args.json))
     elif args.target == "remote":
-        asyncio.run(run_remote(args.location))
+        asyncio.run(run_remote(args.location, as_json=args.json))
     else:
-        asyncio.run(run_both(args.location))
+        asyncio.run(run_both(args.location, as_json=args.json))
 
 
 if __name__ == "__main__":
